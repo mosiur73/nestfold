@@ -1,65 +1,143 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState } from 'react';
+import { useFileSystem } from '@/hooks/useFileSystem';
+import Sidebar from '@/components/Sidebar';
+import MainPanel from '@/components/MainPanel';
+import TextEditor from '@/components/TextEditor';
+import Modal from '@/components/Modal';
+import { MenuIcon, XIcon } from '@/components/Icons';
+import { FileSystemItem } from '@/types';
+
+export default function FileExplorerPage() {
+  const {
+    fileSystem,
+    selectedFolderId,
+    expandedFolderIds,
+    selectedFolder,
+    openFile,
+    modal,
+    createItem,
+    renameItem,
+    deleteItem,
+    updateFileContent,
+    toggleFolder,
+    selectFolder,
+    openFileFn,
+    closeFile,
+    openModal,
+    closeModal,
+  } = useFileSystem();
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // ── MODAL CONFIRM ────────────────────────────────────────────────────────
+  function handleModalConfirm(value: string) {
+    const { mode, targetId } = modal;
+    if (mode === 'create-folder' && targetId) {
+      createItem(targetId, value || 'Untitled Folder', 'folder');
+    } else if (mode === 'create-file' && targetId) {
+      const name = value.endsWith('.txt') ? value : `${value}.txt`;
+      createItem(targetId, name, 'text');
+    } else if (mode === 'rename' && targetId) {
+      renameItem(targetId, value);
+    } else if (mode === 'delete' && targetId) {
+      deleteItem(targetId);
+    }
+  }
+
+  // ── TRIGGER MODALS ───────────────────────────────────────────────────────
+  function handleCreateFolder() {
+    openModal('create-folder', selectedFolderId);
+  }
+  function handleCreateFile() {
+    openModal('create-file', selectedFolderId);
+  }
+  function handleRename(item: FileSystemItem) {
+    openModal('rename', item.id, item.name);
+  }
+  function handleDelete(item: FileSystemItem) {
+    openModal('delete', item.id, item.name);
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="flex flex-col h-full bg-slate-50">
+      {/* App Header */}
+      <header className="flex items-center gap-3 px-4 py-2.5 bg-slate-900 border-b border-slate-700 flex-shrink-0 z-40">
+        <button
+          onClick={() => setSidebarOpen((v) => !v)}
+          className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+          aria-label="Toggle sidebar"
+        >
+          {sidebarOpen ? <XIcon size={18} /> : <MenuIcon size={18} />}
+        </button>
+
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-red-500" />
+          <div className="w-3 h-3 rounded-full bg-yellow-400" />
+          <div className="w-3 h-3 rounded-full bg-green-500" />
+        </div>
+
+        <div className="flex-1 flex items-center justify-center">
+          <span className="text-sm font-semibold text-slate-200 tracking-wide">
+            Mini File Explorer
+          </span>
+        </div>
+
+        <span className="text-[11px] text-slate-500 font-medium hidden sm:inline select-none">
+          Webbly Media
+        </span>
+      </header>
+
+      {/* Main layout */}
+      <div className="flex flex-1 min-h-0 relative">
+        <Sidebar
+          fileSystem={fileSystem}
+          selectedFolderId={selectedFolderId}
+          expandedFolderIds={expandedFolderIds}
+          onSelectFolder={(id) => {
+            selectFolder(id);
+            setSidebarOpen(false);
+          }}
+          onToggleFolder={toggleFolder}
+          isOpen={sidebarOpen}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Mobile overlay */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-20 bg-black/40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Content */}
+        <main className="flex-1 flex flex-col min-h-0 min-w-0">
+          {openFile ? (
+            <TextEditor
+              file={openFile}
+              onSave={(content) => updateFileContent(openFile.id, content)}
+              onClose={closeFile}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+          ) : (
+            <MainPanel
+              fileSystem={fileSystem}
+              selectedFolder={selectedFolder}
+              selectedFolderId={selectedFolderId}
+              onSelectFolder={selectFolder}
+              onOpenFile={openFileFn}
+              onCreateFolder={handleCreateFolder}
+              onCreateFile={handleCreateFile}
+              onRename={handleRename}
+              onDelete={handleDelete}
+            />
+          )}
+        </main>
+      </div>
+
+      {/* Modal */}
+      <Modal modal={modal} onClose={closeModal} onConfirm={handleModalConfirm} />
     </div>
   );
 }
